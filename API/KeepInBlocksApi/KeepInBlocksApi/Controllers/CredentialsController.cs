@@ -88,21 +88,8 @@ namespace KeepInBlocksApi.Controllers
             return NoContent();
         }
 
-        // POST: api/Credentials
-        [HttpPost]
-        public async Task<IActionResult> PostCredentials([FromBody] Credentials credentials)
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
 
-            _context.Credentials.Add(credentials);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetCredentials", new { id = credentials.Id }, credentials);
-        }
-
+        #region One Time SignIn
         [HttpPost("OneTimeSignIn")]
         public async Task<IActionResult> OneTimeSignIn([FromBody] Credentials credentials)
         {
@@ -142,7 +129,9 @@ namespace KeepInBlocksApi.Controllers
             return Ok(response);
 
         }
+        #endregion
 
+        #region get Private key and credentials from DataBAse
         private Credentials getPrivateKey(string UniqueKey)
         {
             var password = CustomHashing.ComputeSha256Hash(UniqueKey);
@@ -151,7 +140,90 @@ namespace KeepInBlocksApi.Controllers
 
             return  model;
         }
+        #endregion
+       
+        #region Get Wallet Balance
+        [HttpGet("GetWalletBalance")]
+        public async Task<IActionResult> GetWalletBalanceBalance(string uniqueKey)
+        {
+            GenericResponse<string> response = new GenericResponse<string>();
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
+            var credential = getPrivateKey(uniqueKey);
+
+            var account = new Account(credential.PrimaryKey);
+            var web3 = new Nethereum.Geth.Web3Geth(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
+
+            BlockChainController blockChainController = new BlockChainController(web3, account);
+
+            try
+            {
+                var balance = await blockChainController.GetWalletBalance(account.Address);
+                response.HasError = false;
+                response.Messege = "successfull";
+                response.Model = balance;
+                response.StatusCode = 200;
+
+            }
+            catch (Exception e)
+            {
+                response.HasError = true;
+                response.Messege = e.ToString();
+                response.Model = null;
+                response.StatusCode = 400;
+
+            }
+
+            return Ok(response);
+
+        }
+        #endregion
+
+        #region Get Wallet Transaction
+        [HttpGet("GetWalletTransaction")]
+        public async Task<IActionResult> GetWalletTransaction(string uniqueKey)
+        {
+            GenericResponse<List<TransactionModel>> response = new GenericResponse<List<TransactionModel>>();
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var credential = getPrivateKey(uniqueKey);
+
+            var account = new Account(credential.PrimaryKey);
+            var web3 = new Nethereum.Geth.Web3Geth(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
+
+            BlockChainController blockChainController = new BlockChainController(web3, account);
+
+            try
+            {
+                var transactionList = await blockChainController.GetTransaction(account.Address);
+                response.HasError = false;
+                response.Messege = "successfull";
+                response.Model = transactionList;
+                response.StatusCode = 200;
+
+            }
+            catch (Exception e)
+            {
+                response.HasError = true;
+                response.Messege = e.ToString();
+                response.Model = null;
+                response.StatusCode = 400;
+
+            }
+
+            return Ok(response);
+
+        }
+        #endregion
+
+
+        #region Post Data In Blocks
         [HttpPost("PostDataInBlocks")]
         public async Task<IActionResult> PostDataInBlocks([FromBody]DataModel dataModel,[FromQuery]string uniqueKey)
         {
@@ -211,18 +283,25 @@ namespace KeepInBlocksApi.Controllers
 
             return Ok(response);
         }
+        #endregion
 
-
+        #region Create a New Wallet If User Dont Have Existing One
         [HttpGet("CreateWallet")]
         public async Task<IActionResult> CreateWallet(string uniqueKey)
         {
-            GenericResponse<string> response = new GenericResponse<string>();
-
+            GenericResponse<Account> response = new GenericResponse<Account>();
+            Credentials model = new Credentials();
             BlockChainController chainController = new BlockChainController();
             try
             {
                 var account = await chainController
                     .CreateWallet(uniqueKey);
+
+                model.UniqueKey = CustomHashing.ComputeSha256Hash(uniqueKey);
+                model.PrimaryKey = CustomEncryption.Encrypt(account.PrivateKey, uniqueKey);
+
+                _context.Credentials.Add(model);
+               await  _context.SaveChangesAsync();
 
                 if(account!=null)
                 {
@@ -246,9 +325,9 @@ namespace KeepInBlocksApi.Controllers
 
 
         }
+        #endregion
 
-
-
+        #region Get Data From Blocks
         [HttpGet ("GetDataFromBlocks")]
         public async Task<IActionResult> GetDataFromBlocks(string uniqueKey)
         {
@@ -282,6 +361,7 @@ namespace KeepInBlocksApi.Controllers
 
             return Ok(response);
         }
+        #endregion
 
         // DELETE: api/Credentials/5
         [HttpDelete("{id}")]

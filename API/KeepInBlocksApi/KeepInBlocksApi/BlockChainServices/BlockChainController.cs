@@ -1,6 +1,8 @@
-﻿using KeepInBlocksApi.BlockChainServices.Cryptography;
+﻿using KeepInBlocksApi.ApiServices;
+using KeepInBlocksApi.BlockChainServices.Cryptography;
 using KeepInBlocksApi.BusinessModel;
 using KeepInBlocksApi.Models;
+using Nethereum.Hex.HexConvertors.Extensions;
 using Nethereum.Hex.HexTypes;
 using Nethereum.RPC.Eth.DTOs;
 using Nethereum.Web3;
@@ -19,10 +21,12 @@ namespace KeepInBlocksApi.BlockChainServices
     {
         Web3 web3Instance;
         Account GethAccount;
+        ApiManager manager;
         public BlockChainController(Web3 web3,Account account)
         {
             web3Instance = web3;
             GethAccount = account;
+            manager = new ApiManager(new RestServices());
         }
 
         public BlockChainController()
@@ -30,7 +34,7 @@ namespace KeepInBlocksApi.BlockChainServices
 
         }
 
-        #region Set Contract data by passing contract Address and Data Model
+      #region Set Contract data by passing contract Address and Data Model
       public  async Task<Tuple<TransactionReceipt,string>> SetContractData( DataModel model, string key)
         {
 
@@ -102,11 +106,39 @@ namespace KeepInBlocksApi.BlockChainServices
         }
         #endregion
 
+      #region Get Wallet Balance
+        public async Task<string>GetWalletBalance(string address)
+        {
 
-     
+            var response =  await manager.GetWalletBalance(address);
+            if (response.status.Equals("1"))
+            {
+               
 
-        #region  deploy contract and get contract Add to store in database
-        async Task<string> DeployContract()
+                return response.result;
+            }
+            else
+                return "Error";
+
+        }
+        #endregion
+
+      #region Get Wallet Transaction
+        public async Task<List<TransactionModel>> GetTransaction(string address)
+        {
+
+            var response = await manager.GetTransaction(address);
+            if (response.status.Equals("1"))
+            
+                return response.result;
+
+            return response.result;
+        }
+        #endregion
+
+
+      #region  deploy contract and get contract Add to store in database
+        public async Task<string> DeployContract()
         {
 
 
@@ -135,13 +167,12 @@ namespace KeepInBlocksApi.BlockChainServices
         #endregion
 
 
-        #region Create New Wallet
-        public async Task<string> CreateWallet(string uniquekey)
+      #region Create New Wallet
+        public async Task<Account> CreateWallet(string uniquekey)
         {
-             var web3 = new Nethereum.Geth.Web3Geth("https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
-            
-            var account = await web3.Personal.NewAccount.SendRequestAsync(uniquekey);
-
+            var ecKey = Nethereum.Signer.EthECKey.GenerateKey();
+            var privateKey = ecKey.GetPrivateKeyAsBytes().ToHex();
+            var account = new Nethereum.Web3.Accounts.Account(privateKey);
             return account;
         }
         #endregion
