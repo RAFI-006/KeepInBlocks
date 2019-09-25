@@ -111,7 +111,7 @@ namespace KeepInBlocksApi.Controllers
 
                 response.HasError = false;
                 response.Messege = "successfull";
-                response.Model = hashedCredentials;
+                response.Result = hashedCredentials;
                 response.StatusCode = 200;
 
             }
@@ -119,7 +119,7 @@ namespace KeepInBlocksApi.Controllers
             {
                 response.HasError = true;
                 response.Messege = e.ToString();
-                response.Model = null;
+                response.Result = null;
                 response.StatusCode = 400;
 
 
@@ -136,7 +136,11 @@ namespace KeepInBlocksApi.Controllers
         {
             var password = CustomHashing.ComputeSha256Hash(UniqueKey);
             var model = _context.Credentials.Where(p =>p.UniqueKey==password).FirstOrDefault();
+
+            if(model!=null)
             model.PrimaryKey = CustomEncryption.Decrypt(model.PrimaryKey, UniqueKey);
+
+
 
             return  model;
         }
@@ -153,27 +157,38 @@ namespace KeepInBlocksApi.Controllers
             }
 
             var credential = getPrivateKey(uniqueKey);
-
-            var account = new Account(credential.PrimaryKey);
-            var web3 = new Nethereum.Geth.Web3Geth(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
-
-            BlockChainController blockChainController = new BlockChainController(web3, account);
-
-            try
+            if (credential != null)
             {
-                var balance = await blockChainController.GetWalletBalance(account.Address);
-                response.HasError = false;
-                response.Messege = "successfull";
-                response.Model = balance;
-                response.StatusCode = 200;
+                var account = new Account(credential.PrimaryKey);
+                var web3 = new Nethereum.Geth.Web3Geth(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
 
+                BlockChainController blockChainController = new BlockChainController(web3, account);
+
+                try
+                {
+                    var balance = await blockChainController.GetWalletBalance(account.Address);
+                    response.HasError = false;
+                    response.Messege = "successfull";
+                    response.Result = balance;
+                    response.StatusCode = 200;
+
+                }
+                catch (Exception e)
+                {
+                    response.HasError = true;
+                    response.Messege = e.ToString();
+                    response.Result = null;
+                    response.StatusCode = 400;
+
+                }
             }
-            catch (Exception e)
+            else
             {
                 response.HasError = true;
-                response.Messege = e.ToString();
-                response.Model = null;
+                
+                response.Result = "User Does Not exist";
                 response.StatusCode = 400;
+
 
             }
 
@@ -187,34 +202,45 @@ namespace KeepInBlocksApi.Controllers
         public async Task<IActionResult> GetWalletTransaction(string uniqueKey)
         {
             GenericResponse<List<TransactionModel>> response = new GenericResponse<List<TransactionModel>>();
-            if (!ModelState.IsValid)
+           
+            if (!ModelState.IsValid )
             {
                 return BadRequest(ModelState);
             }
 
+
             var credential = getPrivateKey(uniqueKey);
-
-            var account = new Account(credential.PrimaryKey);
-            var web3 = new Nethereum.Geth.Web3Geth(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
-
-            BlockChainController blockChainController = new BlockChainController(web3, account);
-
-            try
+            if (credential != null)
             {
-                var transactionList = await blockChainController.GetTransaction(account.Address);
-                response.HasError = false;
-                response.Messege = "successfull";
-                response.Model = transactionList;
-                response.StatusCode = 200;
+                var account = new Account(credential.PrimaryKey);
+                var web3 = new Nethereum.Geth.Web3Geth(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
 
+                BlockChainController blockChainController = new BlockChainController(web3, account);
+
+                try
+                {
+                    var transactionList = await blockChainController.GetTransaction(account.Address);
+                    response.HasError = false;
+                    response.Messege = "successfull";
+                    response.Result = transactionList;
+                    response.StatusCode = 200;
+
+                }
+                catch (Exception e)
+                {
+                    response.HasError = true;
+                    response.Messege = e.ToString();
+                    response.Result = null;
+                    response.StatusCode = 400;
+
+                }
             }
-            catch (Exception e)
+            else
             {
                 response.HasError = true;
-                response.Messege = e.ToString();
-                response.Model = null;
+                response.Messege = "User does not exist";
+                response.Result = null;
                 response.StatusCode = 400;
-
             }
 
             return Ok(response);
@@ -234,51 +260,50 @@ namespace KeepInBlocksApi.Controllers
             }
 
             var userModel = getPrivateKey(uniqueKey);
-
-            var account = new Account(userModel.PrimaryKey);
-            var web3 = new Nethereum.Geth.Web3Geth(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
-
-            BlockChainController blockChainController = new BlockChainController(web3, account);
-
-            try
+            if (userModel != null)
             {
-                var reciept = await blockChainController.SetContractData(dataModel, uniqueKey);
+                var account = new Account(userModel.PrimaryKey);
+                var web3 = new Nethereum.Geth.Web3Geth(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
 
-                if(reciept.Item2!=null)
+                BlockChainController blockChainController = new BlockChainController(web3, account);
+
+                try
                 {
+                    var reciept = await blockChainController.SetContractData(dataModel, uniqueKey);
 
-                    Transaction model = new Transaction();
-                    model.CredentialsId = userModel.Id;
-                    model.TransactionHash = reciept.Item2;
-                    
-                    _context.Transaction.Add(model);
-                    await _context.SaveChangesAsync();
+
+
+                    if (reciept.Item1 != null)
+                    {
+
+                        response.HasError = false;
+                        response.Messege = "Sucessfull";
+                        response.Result = dataModel;
+                        response.StatusCode = 200;
+                    }
+                    else
+                    {
+
+                        response.HasError = true;
+                        response.Messege = "unsucessfull";
+                        response.Result = null;
+                        response.StatusCode = 400;
+
+                    }
 
                 }
-                 
-
-                if (reciept.Item1 != null)
+                catch (Exception e)
                 {
-
-                    response.HasError = false;
-                    response.Messege = "Sucessfull";
-                    response.Model = dataModel;
-                    response.StatusCode = 200;
+                    response.Messege = e.ToString();
                 }
-                else
-                {
-
-                    response.HasError = true;
-                    response.Messege = "unsucessfull";
-                    response.Model = null;
-                    response.StatusCode = 400;
-
-                }
-
             }
-            catch (Exception e)
+            else
             {
-                response.Messege = e.ToString();
+                response.HasError = true;
+                response.Messege = "user does not exist";
+                response.Result = null;
+                response.StatusCode = 400;
+
             }
 
             return Ok(response);
@@ -307,7 +332,7 @@ namespace KeepInBlocksApi.Controllers
                 {
                     response.HasError = false;
                     response.Messege = "Sucessfull";
-                    response.Model = account;
+                    response.Result = account;
                     response.StatusCode = 200;
                 }
 
@@ -316,7 +341,7 @@ namespace KeepInBlocksApi.Controllers
             {
                 response.HasError = true;
                 response.Messege = "unsucessfull";
-                response.Model = null;
+                response.Result = null;
                 response.StatusCode = 400;
             }
 
@@ -333,27 +358,39 @@ namespace KeepInBlocksApi.Controllers
         {
             GenericResponse<List<DataModel>> response = new GenericResponse<List<DataModel>>();
             var userModel = getPrivateKey(uniqueKey);
-
-            var account = new Account(userModel.PrimaryKey);
-            var web3 = new Web3(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
-
-            BlockChainController blockChainController = new BlockChainController(web3,account);
-
-
-            var listofData = await blockChainController.GetContractData(uniqueKey); 
-            
-            if(listofData!=null)
+            if (userModel != null)
             {
-                response.HasError = false;
-                response.Messege = "Sucessfull";
-                response.Model = listofData;
-                response.StatusCode = 200;
+                var account = new Account(userModel.PrimaryKey);
+                var web3 = new Web3(account, "https://ropsten.infura.io/v3/1e1358ffb3db40f69b7bdb6c51d016b6");
+
+                BlockChainController blockChainController = new BlockChainController(web3, account);
+
+
+                var listofData = await blockChainController.GetContractData(uniqueKey);
+
+                if (listofData != null)
+                {
+                    response.HasError = false;
+                    response.Messege = "Sucessfull";
+                    response.Result = listofData;
+                    response.StatusCode = 200;
+                }
+                else
+                {
+                    response.HasError = true;
+                    response.Messege = "UnSucessfull";
+                    response.Result = null;
+                    response.StatusCode = 400;
+
+
+                }
             }
             else
             {
+
                 response.HasError = true;
-                response.Messege = "UnSucessfull";
-                response.Model = null;
+                response.Messege = "user does not exist";
+                response.Result = null;
                 response.StatusCode = 400;
 
 

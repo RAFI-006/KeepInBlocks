@@ -113,9 +113,11 @@ namespace KeepInBlocksApi.BlockChainServices
             var response =  await manager.GetWalletBalance(address);
             if (response.status.Equals("1"))
             {
-               
 
-                return response.result;
+                var floatBalance = float.Parse(response.result);
+                floatBalance = floatBalance / 1000000000000000000;
+
+                return floatBalance.ToString();
             }
             else
                 return "Error";

@@ -8,7 +8,7 @@ namespace KeepInBlocksApi.Responses
     public class GenericResponse<T>
     {
         public string Messege { get; set; }
-        public T Model { get; set; }
+        public T Result { get; set; }
         public bool HasError { get; set; }
         public int StatusCode { get; set; }
 
